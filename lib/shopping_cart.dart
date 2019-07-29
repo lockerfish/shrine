@@ -15,6 +15,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:scoped_model/scoped_model.dart';
+import 'package:square_in_app_payments/in_app_payments.dart';
 
 import 'colors.dart';
 import 'expanding_bottom_sheet.dart';
@@ -87,20 +88,19 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
                     bottom: 16.0,
                     left: 16.0,
                     right: 16.0,
-                    child: RaisedButton(
-                      shape: const BeveledRectangleBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(7.0)),
-                      ),
-                      color: kShrinePink100,
-                      splashColor: kShrineBrown600,
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12.0),
-                        child: Text('CLEAR CART'),
-                      ),
-                      onPressed: () {
-                        model.clearCart();
-                        ExpandingBottomSheet.of(context).close();
-                      },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        buildCartButton('TAKE MY MONEY', () async {
+                          await _payment();
+                          model.clearCart();
+                          ExpandingBottomSheet.of(context).close();
+                        }),
+                        buildCartButton('CLEAR CART', () {
+                          model.clearCart();
+                          ExpandingBottomSheet.of(context).close();
+                        }),
+                      ],
                     ),
                   ),
                 ],
@@ -111,6 +111,50 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
       ),
     );
   }
+
+  RaisedButton buildCartButton(String text, Function action) {
+    return RaisedButton(
+      shape: const BeveledRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(7.0)),
+      ),
+      color: kShrinePink100,
+      splashColor: kShrineBrown600,
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 12.0),
+        child: Text(text),
+      ),
+      onPressed: () => action(),
+    );
+  }
+}
+
+Future<Null> _payment() async {
+  print('payment');
+  await InAppPayments.setSquareApplicationId('sq0idp-EiX4-XOihYPfMUYuJovxEA');
+  await InAppPayments.startCardEntryFlow(
+      onCardNonceRequestSuccess: (result) async {
+    try {
+      print('result: $result');
+      // take payment with the card nonce details
+      // you can take a charge
+      // await chargeCard(result);
+
+      // payment finished successfully
+      // you must call this method to close card entry
+      await InAppPayments.completeCardEntry(onCardEntryComplete: () {
+        // Update UI to notify user that the payment flow is finished successfully
+        print('onCardEntryComplete');
+      });
+    } on Exception catch (ex) {
+      // payment failed to complete due to error
+      // notify card entry to show processing error
+      print('error: $ex');
+      await InAppPayments.showCardNonceProcessingError(ex.toString());
+    }
+  }, onCardEntryCancel: () {
+    /// Handle the cancel callback
+    print('onCardEntryCancel');
+  });
 }
 
 class ShoppingCartSummary extends StatelessWidget {
