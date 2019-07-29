@@ -20,6 +20,7 @@ import 'package:square_in_app_payments/in_app_payments.dart';
 import 'colors.dart';
 import 'expanding_bottom_sheet.dart';
 import 'model/app_state_model.dart';
+import 'model/payment_repository.dart';
 import 'model/product.dart';
 
 const _leftColumnWidth = 60.0;
@@ -91,15 +92,10 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: <Widget>[
-                        buildCartButton('TAKE MY MONEY', () async {
-                          await _payment();
-                          model.clearCart();
-                          ExpandingBottomSheet.of(context).close();
-                        }),
-                        buildCartButton('CLEAR CART', () {
-                          model.clearCart();
-                          ExpandingBottomSheet.of(context).close();
-                        }),
+                        buildCartButton(
+                            model, context, 'TAKE MY MONEY', _payment),
+                        buildCartButton(
+                            model, context, 'CLEAR CART', _clearCart),
                       ],
                     ),
                   ),
@@ -112,7 +108,8 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
     );
   }
 
-  RaisedButton buildCartButton(String text, Function action) {
+  RaisedButton buildCartButton(
+      AppStateModel model, BuildContext context, String text, Function action) {
     return RaisedButton(
       shape: const BeveledRectangleBorder(
         borderRadius: BorderRadius.all(Radius.circular(7.0)),
@@ -123,27 +120,34 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
         padding: EdgeInsets.symmetric(vertical: 12.0),
         child: Text(text),
       ),
-      onPressed: () => action(),
+      onPressed: () => action(model, context),
     );
   }
 }
 
-Future<Null> _payment() async {
+void _clearCart(AppStateModel model, BuildContext context) {
+  model.clearCart();
+  ExpandingBottomSheet.of(context).close();
+}
+
+Future<Null> _payment(AppStateModel model, BuildContext context) async {
   print('payment');
-  await InAppPayments.setSquareApplicationId('sq0idp-EiX4-XOihYPfMUYuJovxEA');
+
+  await InAppPayments.setSquareApplicationId('APPLICATION_ID');
   await InAppPayments.startCardEntryFlow(
       onCardNonceRequestSuccess: (result) async {
     try {
-      print('result: $result');
       // take payment with the card nonce details
       // you can take a charge
       // await chargeCard(result);
-
+      var chargeResult = PaymentsRepository.actuallyMakeTheCharge(result);
+      if (chargeResult != 'Success') throw Exception(chargeResult);
       // payment finished successfully
       // you must call this method to close card entry
       await InAppPayments.completeCardEntry(onCardEntryComplete: () {
         // Update UI to notify user that the payment flow is finished successfully
         print('onCardEntryComplete');
+        _clearCart(model, context);
       });
     } on Exception catch (ex) {
       // payment failed to complete due to error
